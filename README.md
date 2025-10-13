@@ -1,104 +1,76 @@
-# Latent Walk Video Generator API
+# Latent Walk Video Generator
 
-A FastAPI service that generates 30-second latent walk videos using HuggingFace checkpoints or a fallback generator.
+A complete system for generating smooth latent space walk videos using AI models.
 
-## RunPod Deployment
+## Project Structure
 
-### 1. Install PyTorch with CUDA 12.1 support
+This repository contains two main components:
 
+- **API**: FastAPI service for video generation
+- **UI**: Web interface for interacting with the API
+
+## Quick Start
+
+### 1. API (Backend)
+
+See the [API README](ui/README.md) for detailed setup instructions.
+
+**RunPod Deployment:**
 ```bash
+# Install PyTorch with CUDA support
 pip install --extra-index-url https://download.pytorch.org/whl/cu121 \
     torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2
-```
 
-### 2. Install requirements
-
-```bash
+# Install requirements
 pip install -r requirements.txt
-```
 
-### 3. Set environment variables (optional)
-
-```bash
-# Optional: HuggingFace token for private repos
+# Set environment variables (optional)
 export HF_TOKEN="your_hf_token_here"
-
-# Optional: API key for authentication
 export API_KEY="your_api_key_here"
-```
 
-### 4. Run the service
-
-```bash
+# Run the service
 uvicorn fastapi_app:app --host 0.0.0.0 --port 8888
 ```
 
-The API will be available at `http://0.0.0.0:8888`
+### 2. UI (Frontend)
+
+```bash
+cd ui
+cp config.example.js config.js
+# Edit config.js to point to your API
+python -m http.server 3000
+# Open http://localhost:3000
+```
+
+## Features
+
+- **Latent Walk Generation**: Smooth interpolation through latent space
+- **HuggingFace Integration**: Loads models from HF Hub
+- **Fallback Generator**: TinyG when HF model unavailable
+- **RESTful API**: Clean FastAPI endpoints
+- **Responsive UI**: Modern web interface
+- **Authentication**: Optional API key protection
+- **Video Export**: MP4 output with configurable parameters
 
 ## API Endpoints
 
-### Health Check
-- **GET** `/healthz` - Returns `{"ok": true}`
-
-### Generate Video
-- **POST** `/generate` - Generate a latent walk video
-- **Headers**: `X-API-Key` (optional, if API_KEY env var is set)
-- **Body**:
-  ```json
-  {
-    "seconds": 30,
-    "fps": 30,
-    "out_res": 512,
-    "anchors": 6,
-    "strength": 2.0,
-    "sharpen": true
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "video_path": "outputs/latent_walk_30s_30fps.mp4",
-    "download_url": "/download?path=latent_walk_30s_30fps.mp4"
-  }
-  ```
-
-### Download Video
-- **GET** `/download?path=<filename>` - Download generated video
-- **Headers**: `X-API-Key` (optional, if API_KEY env var is set)
-
-## Model Loading
-
-The service attempts to load the checkpoint from:
-- **Repository**: `lukua/mono-poc`
-- **File**: `monox_generator_1400.pth`
-- **Key**: `generator_state_dict`
-
-If the checkpoint is missing or incompatible, it falls back to a simple TinyG generator that creates 64×64 images upscaled to the target resolution.
+- `GET /healthz` - Health check
+- `POST /generate` - Generate video
+- `GET /download?path=<file>` - Download video
 
 ## Configuration
 
-- **Default video**: 30 seconds @ 30fps, 512×512 resolution
-- **Latent space**: 128-dimensional
-- **Anchors**: 6 waypoints for smooth interpolation
-- **Strength**: 2.0 (controls latent space exploration)
-- **Output directory**: `outputs/`
+### Environment Variables
 
-## Testing
+- `HF_TOKEN`: HuggingFace token for private repos
+- `API_KEY`: API key for authentication (optional)
 
-Test the API locally:
+### Model Configuration
 
-```bash
-# Health check
-curl http://localhost:8888/healthz
+- **Repository**: `lukua/mono-poc`
+- **Checkpoint**: `monox_generator_1400.pth`
+- **Fallback**: TinyG generator (64×64 → upscaled)
 
-# Generate video (no auth)
-curl -X POST http://localhost:8888/generate \
-  -H "Content-Type: application/json" \
-  -d '{"seconds": 5, "fps": 10, "out_res": 256}'
+## License
 
-# Generate video (with auth)
-curl -X POST http://localhost:8888/generate \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your_api_key" \
-  -d '{"seconds": 30, "fps": 30}'
-```
+This project is part of the mono_gen repository.

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Latent Walk Video Generator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Latent Walk Video Generator</h1>
+            <p>Generate smooth latent space walk videos using AI</p>
+        </header>
+
+        <!-- Step 1: CTA -->
+        <div id="step1" class="step active">
+            <div class="card">
+                <h2>Initiate Latent Walk</h2>
+                <p>Click the button below to generate a 30-second latent walk video. The process may take a few minutes.</p>
+                
+                <div class="controls">
+                    <label for="seconds">Duration (seconds):</label>
+                    <input type="number" id="seconds" value="30" min="5" max="120">
+                    
+                    <label for="fps">FPS:</label>
+                    <input type="number" id="fps" value="30" min="10" max="60">
+                    
+                    <label for="resolution">Resolution:</label>
+                    <select id="resolution">
+                        <option value="256">256x256</option>
+                        <option value="512" selected>512x512</option>
+                        <option value="1024">1024x1024</option>
+                    </select>
+                </div>
+                
+                <button id="generateBtn" class="generate-btn">
+                    <span class="btn-text">Generate Video</span>
+                    <span class="btn-loading" style="display: none;">
+                        <div class="spinner"></div>
+                        Generating...
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: Preview -->
+        <div id="step2" class="step">
+            <div class="card">
+                <h2>Video Preview</h2>
+                <p>Your latent walk video has been generated successfully!</p>
+                
+                <div class="video-container">
+                    <video id="previewVideo" controls>
+                        <source id="videoSource" src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                
+                <div class="actions">
+                    <a id="downloadLink" href="#" class="download-btn" download>
+                        📥 Download Video
+                    </a>
+                    <button id="newVideoBtn" class="secondary-btn">
+                        🎬 Generate New Video
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="error-message" style="display: none;">
+            <h3>Error</h3>
+            <p id="errorText"></p>
+            <button id="retryBtn" class="secondary-btn">Try Again</button>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
