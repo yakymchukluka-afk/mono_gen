@@ -16,9 +16,16 @@ function showView(id) {
 // API helpers for new job-based system
 async function initiateLatentWalk() {
   const url = `${APP_CONFIG.API_BASE}/generate`;
+  const headers = { 'Content-Type': 'application/json' };
+  
+  // Add API key if configured
+  if (APP_CONFIG.API_KEY) {
+    headers['X-API-Key'] = APP_CONFIG.API_KEY;
+  }
+  
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body: JSON.stringify({
       seconds: 30,
       fps: 30,
@@ -35,7 +42,14 @@ async function initiateLatentWalk() {
 
 async function getJobStatus(jobId) {
   const url = `${APP_CONFIG.API_BASE}/status/${jobId}`;
-  const res = await fetch(url);
+  const headers = {};
+  
+  // Add API key if configured
+  if (APP_CONFIG.API_KEY) {
+    headers['X-API-Key'] = APP_CONFIG.API_KEY;
+  }
+  
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`status check failed (${res.status})`);
   return await res.json();
 }
