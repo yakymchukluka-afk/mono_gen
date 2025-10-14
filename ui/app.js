@@ -2,8 +2,8 @@
 const APP_CONFIG = Object.assign({
   API_BASE: "", // same-origin by default
   DEFAULT_CHECKPOINT: "checkpoint-13",
-  POLL_INTERVAL_MS: 1500,
-  POLL_TIMEOUT_MS: 5 * 60 * 1000,
+  POLL_INTERVAL_MS: 2000, // Poll every 2 seconds
+  POLL_TIMEOUT_MS: 10 * 60 * 1000, // 10 minute timeout
   LOG_POLL_MS: 1000
 }, (window.CONFIG || {}));
 
@@ -13,29 +13,31 @@ function showView(id) {
   document.getElementById(id).classList.add('view--active');
 }
 
-// API helpers — adjust mapping if your backend differs
-async function initiateLatentWalk(checkpoint) {
+// API helpers for new job-based system
+async function initiateLatentWalk() {
   const url = `${APP_CONFIG.API_BASE}/generate`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ checkpoint })
+    body: JSON.stringify({
+      seconds: 30,
+      fps: 30,
+      out_res: 512,
+      anchors: 6,
+      strength: 2.0,
+      sharpen: false
+    })
   });
   if (!res.ok) throw new Error(`initiate failed (${res.status})`);
-  return parseInitiateResponse(await res.json());
+  const data = await res.json();
+  return { jobId: data.job_id };
 }
 
-function parseInitiateResponse(json) {
-  // Expect: { video_path, download_url }
-  return { videoPath: json.video_path, downloadUrl: json.download_url };
-}
-
-// Logs
-async function fetchLogsTail(tail) {
-  const url = `${APP_CONFIG.API_BASE}/logs?tail=${encodeURIComponent(tail || 200)}`;
-  const res = await fetch(url, { headers: { 'Accept': 'text/plain' } });
-  if (!res.ok) return '';
-  return await res.text();
+async function getJobStatus(jobId) {
+  const url = `${APP_CONFIG.API_BASE}/status/${jobId}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`status check failed (${res.status})`);
+  return await res.json();
 }
 
 // UI bindings
@@ -51,7 +53,7 @@ const consoleEl = document.getElementById('console');
 
 let pollTimer = null;
 let pollStartedAt = 0;
-let logTimer = null;
+let currentJobId = null;
 let generating = false;
 
 btnStart.addEventListener('click', async () => {
@@ -65,63 +67,120 @@ btnStart.addEventListener('click', async () => {
     showView('step-progress');
     // Reset UI
     progressBar.style.width = '0%';
-    statusText.textContent = 'producing ...';
+    statusText.textContent = 'queued ...';
     statusCheckpoint.textContent = APP_CONFIG.DEFAULT_CHECKPOINT;
     pollStartedAt = Date.now();
     statusTime.textContent = new Date(pollStartedAt).toISOString();
     if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = ''; }
 
-    startLogPolling();
-    const { downloadUrl } = await initiateLatentWalk(APP_CONFIG.DEFAULT_CHECKPOINT);
-    // we no longer poll a status endpoint; we will fetch the video with retries
-    await fetchVideoWithRetry(downloadUrl, 10000);
-    showView('step-preview');
+    // Start job
+    const { jobId } = await initiateLatentWalk();
+    currentJobId = jobId;
+    
+    // Start polling for status
+    startStatusPolling(jobId);
+    
   } catch (err) {
     console.error(err);
     if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
     showView('step-landing');
-  } finally {
-    // Re-enable button
     generating = false;
     btnStart.disabled = false;
   }
 });
 
-function startLogPolling() {
-  if (!consoleEl) return;
-  if (!APP_CONFIG.LOG_POLL_MS || APP_CONFIG.LOG_POLL_MS <= 0) return;
-  clearInterval(logTimer);
-  logTimer = setInterval(async () => {
+function startStatusPolling(jobId) {
+  clearInterval(pollTimer);
+  
+  pollTimer = setInterval(async () => {
     try {
-      const txt = await fetchLogsTail(200);
-      if (typeof txt === 'string') consoleEl.textContent = txt.trim();
-    } catch {}
-  }, APP_CONFIG.LOG_POLL_MS);
+      const status = await getJobStatus(jobId);
+      updateProgress(status);
+      
+      if (status.state === 'done') {
+        clearInterval(pollTimer);
+        await handleJobComplete(status);
+      } else if (status.state === 'error') {
+        clearInterval(pollTimer);
+        handleJobError(status);
+      }
+      
+      // Check for timeout
+      if (Date.now() - pollStartedAt > APP_CONFIG.POLL_TIMEOUT_MS) {
+        clearInterval(pollTimer);
+        throw new Error('Job timed out');
+      }
+      
+    } catch (err) {
+      console.error('Status polling error:', err);
+      clearInterval(pollTimer);
+      if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
+      showView('step-landing');
+      generating = false;
+      btnStart.disabled = false;
+    }
+  }, APP_CONFIG.POLL_INTERVAL_MS);
 }
 
-async function fetchVideoWithRetry(downloadUrl, timeoutMs) {
-  const started = Date.now();
-  const url = downloadUrl.startsWith('http') ? downloadUrl : `${APP_CONFIG.API_BASE}${downloadUrl}`;
-  let delay = 250;
-  while (true) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        resultVideo.src = objectUrl;
-        resultVideo.load();
-        clearInterval(logTimer);
-        return;
-      }
-    } catch {}
-    if (Date.now() - started > (timeoutMs || 10000)) {
-      clearInterval(logTimer);
-      throw new Error('Download not available after retry window');
-    }
-    await new Promise(r => setTimeout(r, delay));
-    delay = Math.min(2000, delay + 250);
+function updateProgress(status) {
+  // Update progress bar
+  const progressPercent = Math.round(status.progress * 100);
+  progressBar.style.width = `${progressPercent}%`;
+  
+  // Update status text
+  if (status.state === 'queued') {
+    statusText.textContent = 'queued ...';
+  } else if (status.state === 'running') {
+    statusText.textContent = `generating ... ${status.frames_done}/${status.total_frames} frames`;
+  } else if (status.state === 'done') {
+    statusText.textContent = 'complete!';
+  } else if (status.state === 'error') {
+    statusText.textContent = 'error occurred';
   }
+  
+  // Update console with log tail
+  if (consoleEl && status.log_tail && status.log_tail.length > 0) {
+    consoleEl.textContent = status.log_tail.join('\n');
+  }
+}
+
+async function handleJobComplete(status) {
+  try {
+    // Show completion status
+    statusText.textContent = 'complete!';
+    progressBar.style.width = '100%';
+    
+    // Wait a moment then show preview
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Load video
+    if (status.download_url) {
+      const videoUrl = status.download_url.startsWith('http') ? 
+        status.download_url : 
+        `${APP_CONFIG.API_BASE}${status.download_url}`;
+      
+      resultVideo.src = videoUrl;
+      resultVideo.load();
+    }
+    
+    showView('step-preview');
+    
+  } catch (err) {
+    console.error('Error handling job completion:', err);
+    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
+    showView('step-landing');
+  } finally {
+    generating = false;
+    btnStart.disabled = false;
+  }
+}
+
+function handleJobError(status) {
+  console.error('Job failed:', status);
+  if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: Job failed`; }
+  showView('step-landing');
+  generating = false;
+  btnStart.disabled = false;
 }
 
 back1.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
@@ -129,8 +188,8 @@ back2.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
 
 function abortAndHome() {
   clearInterval(pollTimer);
-  clearInterval(logTimer);
   showView('step-landing');
+  generating = false;
+  btnStart.disabled = false;
+  currentJobId = null;
 }
-
-

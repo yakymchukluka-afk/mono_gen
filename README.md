@@ -22,9 +22,10 @@ mono_gen/
 
 ## Features
 
+- **Asynchronous Generation**: Background job processing with real-time progress tracking
 - **Latent Walk Generation**: Create smooth interpolations through StyleGAN latent space
-- **Web UI**: Clean 3-step interface for generation and preview
-- **FastAPI Backend**: Robust API with proper error handling
+- **Web UI**: Clean 3-step interface with live progress and logs
+- **FastAPI Backend**: Robust API with job queue and status polling
 - **RunPod Ready**: Optimized for RunPod deployment
 
 ## Quick Start (RunPod)
@@ -58,8 +59,39 @@ mono_gen/
 
 - `GET /` - Serves the UI
 - `GET /healthz` - Health check
-- `POST /generate` - Generate latent walk video
+- `POST /generate` - Start latent walk video generation (returns job_id)
+- `GET /status/{job_id}` - Get job status and progress
 - `GET /download?path=<filename>` - Download generated video
+
+### Job System
+
+The API uses an asynchronous job system for video generation:
+
+1. **Start Generation**: `POST /generate` returns immediately with a `job_id`
+2. **Poll Status**: `GET /status/{job_id}` returns current progress and logs
+3. **Download Result**: When complete, use the `download_url` from status
+
+#### Status Response Format
+
+```json
+{
+  "state": "queued|running|done|error",
+  "progress": 0.0,           // 0..1
+  "frames_done": 42,
+  "total_frames": 900,
+  "log_tail": ["Generated 30/900 frames", "..."],  // last ~50 lines
+  "download_url": "/download?path=latent_walk_...mp4" // when state=done
+}
+```
+
+### UI Flow
+
+1. **Landing**: User clicks "INITIATE LATENT WALK"
+2. **Progress**: UI polls `/status/{job_id}` every 2 seconds showing:
+   - Progress bar (0-100%)
+   - Frame count (e.g., "42/900 frames")
+   - Live log output
+3. **Preview**: When complete, shows video player with download link
 
 ## Environment Variables
 
