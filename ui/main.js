@@ -37,6 +37,8 @@ const resolutionSelect = document.getElementById('resolution');
 
 // State
 let currentVideoPath = null;
+let currentJobId = null;
+let statusCheckInterval = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -88,7 +90,7 @@ async function generateVideo() {
             headers['X-API-Key'] = config.API_KEY;
         }
         
-        // Make API call
+        // Start video generation
         const response = await fetch(`${config.API_BASE}/generate`, {
             method: 'POST',
             headers: headers,
@@ -101,17 +103,75 @@ async function generateVideo() {
         }
         
         const data = await response.json();
+        currentJobId = data.job_id;
         
-        // Store video path and show preview
-        currentVideoPath = data.download_url;
-        showVideoPreview(data.download_url);
+        // Start polling for status
+        startStatusPolling();
         
     } catch (error) {
         console.error('Generation failed:', error);
         showError(error.message);
-    } finally {
         setLoading(false);
     }
+}
+
+function startStatusPolling() {
+    if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+    }
+    
+    statusCheckInterval = setInterval(async () => {
+        try {
+            await checkJobStatus();
+        } catch (error) {
+            console.error('Status check failed:', error);
+            stopStatusPolling();
+            showError('Failed to check generation status');
+            setLoading(false);
+        }
+    }, 2000); // Check every 2 seconds
+}
+
+function stopStatusPolling() {
+    if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+        statusCheckInterval = null;
+    }
+}
+
+async function checkJobStatus() {
+    if (!currentJobId) return;
+    
+    const headers = {};
+    if (config.API_KEY) {
+        headers['X-API-Key'] = config.API_KEY;
+    }
+    
+    const response = await fetch(`${config.API_BASE}/status/${currentJobId}`, {
+        headers: headers
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Status check failed: ${response.status}`);
+    }
+    
+    const status = await response.json();
+    
+    if (status.status === 'completed') {
+        stopStatusPolling();
+        currentVideoPath = status.download_url;
+        showVideoPreview(status.download_url);
+        setLoading(false);
+    } else if (status.status === 'error') {
+        stopStatusPolling();
+        showError(status.error || 'Video generation failed');
+        setLoading(false);
+    } else if (status.status === 'processing') {
+        setLoading(true, 'Generating video...');
+    } else if (status.status === 'queued') {
+        setLoading(true, 'Queued for generation...');
+    }
+    // Continue polling for queued/processing status
 }
 
 function showVideoPreview(downloadUrl) {
@@ -130,14 +190,24 @@ function showVideoPreview(downloadUrl) {
 }
 
 function showStep1() {
+    stopStatusPolling();
     step2.classList.remove('active');
     step1.classList.add('active');
     hideError();
+    currentJobId = null;
+    currentVideoPath = null;
 }
 
-function setLoading(loading) {
+function setLoading(loading, message = 'Generating...') {
     generateBtn.disabled = loading;
     generateBtn.classList.toggle('loading', loading);
+    
+    if (loading) {
+        const loadingText = generateBtn.querySelector('.loading-text');
+        if (loadingText) {
+            loadingText.textContent = message;
+        }
+    }
 }
 
 function showError(message) {
