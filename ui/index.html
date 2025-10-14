@@ -78,20 +78,8 @@
       <span>mono-x 2025 | v1.2 | all rights reserved</span>
     </footer>
 
-    <script>
-      (function() {
-        var ts = Date.now();
-        var head = document.getElementsByTagName('head')[0] || document.body;
-        var conf = document.createElement('script');
-        conf.src = './config.js?v=' + ts;
-        conf.onload = function() {
-          var app = document.createElement('script');
-          app.src = './app.js?v=' + ts;
-          document.body.appendChild(app);
-        };
-        head.appendChild(conf);
-      })();
-    </script>
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
   </body>
   </html>
 

@@ -51,6 +51,11 @@ const statusCheckpoint = document.getElementById('status-checkpoint');
 const resultVideo = document.getElementById('result-video');
 const consoleEl = document.getElementById('console');
 
+// Debug logging
+console.log('UI JavaScript loaded');
+console.log('Button element:', btnStart);
+console.log('APP_CONFIG:', APP_CONFIG);
+
 let pollTimer = null;
 let pollStartedAt = 0;
 let currentJobId = null;
