@@ -52,8 +52,15 @@ const consoleEl = document.getElementById('console');
 let pollTimer = null;
 let pollStartedAt = 0;
 let logTimer = null;
+let generating = false;
 
 btnStart.addEventListener('click', async () => {
+  // Prevent double submissions
+  if (generating) return;
+  
+  generating = true;
+  btnStart.disabled = true;
+  
   try {
     showView('step-progress');
     // Reset UI
@@ -73,6 +80,10 @@ btnStart.addEventListener('click', async () => {
     console.error(err);
     if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
     showView('step-landing');
+  } finally {
+    // Re-enable button
+    generating = false;
+    btnStart.disabled = false;
   }
 });
 
