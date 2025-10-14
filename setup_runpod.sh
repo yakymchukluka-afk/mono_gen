@@ -114,7 +114,9 @@ mkdir -p api/outputs
 
 # Start the server
 echo "Starting uvicorn with: $APP"
-nohup uvicorn "$APP" --host 0.0.0.0 --port 8888 --workers 1 --log-level info > server.log 2>&1 &
+cd api
+nohup uvicorn fastapi_app:app --host 0.0.0.0 --port 8888 --workers 1 --log-level info > ../server.log 2>&1 &
+cd ..
 sleep 3
 
 # Show server startup logs
@@ -138,7 +140,9 @@ else
   echo "Trying to restart server..."
   pkill -f uvicorn
   sleep 2
-  nohup uvicorn "$APP" --host 0.0.0.0 --port 8888 --workers 1 --log-level info > server.log 2>&1 &
+  cd api
+  nohup uvicorn fastapi_app:app --host 0.0.0.0 --port 8888 --workers 1 --log-level info > ../server.log 2>&1 &
+  cd ..
   sleep 3
   tail -n 20 server.log
 fi

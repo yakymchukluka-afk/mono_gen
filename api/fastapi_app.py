@@ -11,6 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, List
 import uvicorn
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from app import gen_video
 
 app = FastAPI(title="Latent Walk Video Generator", version="1.0.0")
