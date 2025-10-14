@@ -62,9 +62,14 @@ let currentJobId = null;
 let generating = false;
 
 btnStart.addEventListener('click', async () => {
+  console.log('Button clicked!');
   // Prevent double submissions
-  if (generating) return;
+  if (generating) {
+    console.log('Already generating, ignoring click');
+    return;
+  }
   
+  console.log('Starting generation...');
   generating = true;
   btnStart.disabled = true;
   
