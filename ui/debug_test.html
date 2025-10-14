@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px; }
+        div { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .log { background: #f0f0f0; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Debug Test for mono_gen API</h1>
+    
+    <button id="test-generate">Test Generate (2s video)</button>
+    <button id="test-generate-long">Test Generate (10s video)</button>
+    <button id="test-status">Test Status Check</button>
+    
+    <div id="result"></div>
+    <div id="status" class="log"></div>
+    
+    <script>
+        const resultDiv = document.getElementById('result');
+        const statusDiv = document.getElementById('status');
+        let currentJobId = null;
+        
+        function log(message) {
+            statusDiv.textContent += new Date().toISOString() + ': ' + message + '\n';
+            console.log(message);
+        }
+        
+        document.getElementById('test-generate').addEventListener('click', async () => {
+            try {
+                log('Starting 2s video generation...');
+                
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        seconds: 2,
+                        fps: 8,
+                        out_res: 256,
+                        anchors: 3,
+                        strength: 2.0,
+                        sharpen: false
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                currentJobId = data.job_id;
+                resultDiv.textContent = `Job ID: ${currentJobId}`;
+                log(`Generate call successful! Job ID: ${currentJobId}`);
+                
+                // Start polling
+                pollStatus();
+                
+            } catch (error) {
+                log(`Error: ${error.message}`);
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        document.getElementById('test-generate-long').addEventListener('click', async () => {
+            try {
+                log('Starting 10s video generation...');
+                
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        seconds: 10,
+                        fps: 30,
+                        out_res: 512,
+                        anchors: 6,
+                        strength: 2.0,
+                        sharpen: false
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                currentJobId = data.job_id;
+                resultDiv.textContent = `Job ID: ${currentJobId}`;
+                log(`Generate call successful! Job ID: ${currentJobId}`);
+                
+                // Start polling
+                pollStatus();
+                
+            } catch (error) {
+                log(`Error: ${error.message}`);
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        document.getElementById('test-status').addEventListener('click', async () => {
+            if (!currentJobId) {
+                log('No job ID available. Generate a video first.');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/status/${currentJobId}`);
+                const data = await response.json();
+                log(`Status: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                log(`Status check error: ${error.message}`);
+            }
+        });
+        
+        function pollStatus() {
+            if (!currentJobId) return;
+            
+            fetch(`/status/${currentJobId}`)
+                .then(response => response.json())
+                .then(data => {
+                    log(`Status: ${data.state} | Progress: ${Math.round(data.progress * 100)}% | Frames: ${data.frames_done}/${data.total_frames}`);
+                    
+                    if (data.state === 'done') {
+                        log(`Job complete! Download URL: ${data.download_url}`);
+                        return;
+                    } else if (data.state === 'error') {
+                        log(`Job failed: ${data.error || 'Unknown error'}`);
+                        return;
+                    }
+                    
+                    // Continue polling
+                    setTimeout(pollStatus, 1000);
+                })
+                .catch(error => {
+                    log(`Polling error: ${error.message}`);
+                });
+        }
+    </script>
+</body>
+</html>

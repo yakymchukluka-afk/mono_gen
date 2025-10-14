@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug UI</title>
+</head>
+<body>
+    <h1>Debug UI</h1>
+    <button id="test-btn">Test API Call</button>
+    <div id="result"></div>
+    <div id="status"></div>
+    
+    <script>
+        const resultDiv = document.getElementById('result');
+        const statusDiv = document.getElementById('status');
+        
+        document.getElementById('test-btn').addEventListener('click', async () => {
+            try {
+                statusDiv.textContent = 'Calling /generate...';
+                
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        seconds: 2,
+                        fps: 8,
+                        out_res: 256,
+                        anchors: 3,
+                        strength: 2.0,
+                        sharpen: false
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                resultDiv.textContent = `Job ID: ${data.job_id}`;
+                statusDiv.textContent = 'Generate call successful!';
+                
+                // Now poll status
+                const jobId = data.job_id;
+                statusDiv.textContent += ` | Polling status for job ${jobId}...`;
+                
+                const pollStatus = async () => {
+                    try {
+                        const statusResponse = await fetch(`/status/${jobId}`);
+                        const statusData = await statusResponse.json();
+                        
+                        statusDiv.textContent = `Status: ${statusData.state} | Progress: ${Math.round(statusData.progress * 100)}% | Frames: ${statusData.frames_done}/${statusData.total_frames}`;
+                        
+                        if (statusData.state === 'done') {
+                            statusDiv.textContent += ` | Download URL: ${statusData.download_url}`;
+                            return;
+                        } else if (statusData.state === 'error') {
+                            statusDiv.textContent += ` | ERROR: ${statusData.error || 'Unknown error'}`;
+                            return;
+                        }
+                        
+                        // Continue polling
+                        setTimeout(pollStatus, 1000);
+                    } catch (err) {
+                        statusDiv.textContent = `Status polling error: ${err.message}`;
+                    }
+                };
+                
+                pollStatus();
+                
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                statusDiv.textContent = 'API call failed';
+            }
+        });
+    </script>
+</body>
+</html>
