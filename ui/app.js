@@ -87,6 +87,7 @@ btnStart.addEventListener('click', async () => {
     generating = false;
     btnStart.disabled = false;
   }
+  // Note: generating and btnStart.disabled are handled in startStatusPolling callbacks
 });
 
 function startStatusPolling(jobId) {
