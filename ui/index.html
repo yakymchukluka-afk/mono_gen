@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>mono_gen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <a class="logo" href="#" aria-label="mono-x home">
+      <img class="logo__img" src="https://drive.google.com/uc?export=view&id=1MpNJTYjJnl6gbKP43YQ_7Lihi3A_IvBK" alt="mono-x logo" />
+    </a>
+    <main id="app" class="app">
+      <!-- Step 1: Landing -->
+      <section id="step-landing" class="view view--active">
+        <div class="container container--centered">
+          <h1 class="title">mono_gen readme</h1>
+          <p class="lead lead--lined">
+            MonoX is a participative art engine based on StyleGAN-V. It learns
+            from analog monotypes to simulate a visual latent evolution. Each walk
+            through latent space generates one unrepeatable Mono.
+            <a class="link" href="#" id="learn-more">learn more &gt;</a>
+          </p>
+
+          <div class="howto">
+            <h2 class="subtitle">How to Use</h2>
+            <ol class="list">
+              <li>Initiate Latent Walk → triggers generation</li>
+              <li>Receive your Mono → stored temporarily</li>
+              <li>Mint to Wallet → available for gas fee only</li>
+              <li>Blend with Others → if eligible for current epoch</li>
+              <li>No account creation required. All actions are public.</li>
+            </ol>
+          </div>
+
+          <div class="cta">
+            <button id="btn-start" class="btn btn--primary">INITIATE LATENT WALK</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 2: Progress -->
+      <section id="step-progress" class="view">
+        <div class="container container--center">
+          <a href="#" id="back-to-landing" class="link link--back">&lt; Go back</a>
+          <h1 class="title">mono latent walk</h1>
+          <div class="progress">
+            <div id="progress-bar" class="progress__bar" style="width: 0%"></div>
+          </div>
+          <pre id="console" class="console" aria-live="polite" aria-atomic="false" hidden></pre>
+          <div class="meta">
+            <div class="meta__left">
+              <div>&gt; <span id="status-text">producing ...</span></div>
+            </div>
+            <div class="meta__right">
+              <div>time: <span id="status-time">—</span></div>
+              <div>lineage: <span id="status-checkpoint">—</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3: Preview -->
+      <section id="step-preview" class="view">
+        <div class="container container--center">
+          <a href="#" id="back-to-landing-2" class="link link--back">&lt; Go back</a>
+          <div class="preview">
+            <video id="result-video" class="preview__media" controls playsinline></video>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>mono-x 2025 | v1.2 | all rights reserved</span>
+    </footer>
+
+    <script>
+      (function() {
+        var ts = Date.now();
+        var head = document.getElementsByTagName('head')[0] || document.body;
+        var conf = document.createElement('script');
+        conf.src = './config.js?v=' + ts;
+        conf.onload = function() {
+          var app = document.createElement('script');
+          app.src = './app.js?v=' + ts;
+          document.body.appendChild(app);
+        };
+        head.appendChild(conf);
+      })();
+    </script>
+  </body>
+  </html>
+
