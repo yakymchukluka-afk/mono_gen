@@ -17,6 +17,7 @@ function buildHeaders(extra = {}) {
 }
 
 // Helper to switch views (compatible with legacy markup)
+// Helper to switch views
 function showView(id) {
   let found = false;
   document.querySelectorAll('.view').forEach(view => {
@@ -73,6 +74,7 @@ const statusTime = document.getElementById('status-time');
 const statusCheckpoint = document.getElementById('status-checkpoint');
 const resultVideo = document.getElementById('result-video');
 const consoleEl = document.getElementById('console');
+const legacyProgressBar = document.getElementById('progress-bar');
 
 function setStartDisabled(disabled) {
   if (btnStart) {
@@ -101,11 +103,15 @@ if (btnStart) {
 
     console.log('Starting generation...');
     generating = true;
-    setStartDisabled(true);
+    btnStart.disabled = true;
 
     try {
       showView('step-progress');
       // Reset UI
+      if (legacyProgressBar) {
+        legacyProgressBar.style.width = '0%';
+      }
+
       if (statusText) {
         statusText.textContent = 'queued ...';
       }
@@ -130,13 +136,50 @@ if (btnStart) {
       if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
       showView('step-landing');
       generating = false;
-      setStartDisabled(false);
+      btnStart.disabled = false;
     }
     // Note: generating and btnStart.disabled are handled in startStatusPolling callbacks
   });
 } else {
   console.warn('Start button not found; check markup.');
 }
+btnStart.addEventListener('click', async () => {
+  console.log('Button clicked!');
+  // Prevent double submissions
+  if (generating) {
+    console.log('Already generating, ignoring click');
+    return;
+  }
+  
+  console.log('Starting generation...');
+  generating = true;
+  btnStart.disabled = true;
+  
+  try {
+    showView('step-progress');
+    // Reset UI
+    statusText.textContent = 'queued ...';
+    statusCheckpoint.textContent = APP_CONFIG.DEFAULT_CHECKPOINT;
+    pollStartedAt = Date.now();
+    statusTime.textContent = new Date(pollStartedAt).toISOString();
+    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = 'initializing latent walk ...'; }
+
+    // Start job
+    const { jobId } = await initiateLatentWalk();
+    currentJobId = jobId;
+    
+    // Start polling for status
+    startStatusPolling(jobId);
+    
+  } catch (err) {
+    console.error(err);
+    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
+    showView('step-landing');
+    generating = false;
+    btnStart.disabled = false;
+  }
+  // Note: generating and btnStart.disabled are handled in startStatusPolling callbacks
+});
 
 function startStatusPolling(jobId) {
   clearInterval(pollTimer);
@@ -173,6 +216,11 @@ function startStatusPolling(jobId) {
 
 function updateProgress(status) {
   // Update status text
+  if (legacyProgressBar && typeof status.progress === 'number') {
+    const pct = Math.max(0, Math.min(1, status.progress));
+    legacyProgressBar.style.width = `${Math.round(pct * 100)}%`;
+  }
+
   if (statusText) {
     if (status.state === 'queued') {
       statusText.textContent = 'queued ...';
@@ -195,6 +243,26 @@ function updateProgress(status) {
   }
 
   if (statusCheckpoint && status.checkpoint) {
+  if (status.state === 'queued') {
+    statusText.textContent = 'queued ...';
+  } else if (status.state === 'running') {
+    if (typeof status.frames_done === 'number' && typeof status.total_frames === 'number') {
+      statusText.textContent = `generating ... ${status.frames_done}/${status.total_frames} frames`;
+    } else {
+      statusText.textContent = 'generating ...';
+    }
+  } else if (status.state === 'done') {
+    statusText.textContent = 'complete!';
+  } else if (status.state === 'error') {
+    statusText.textContent = 'error occurred';
+  }
+
+  const timestamp = status.updated_at || status.completed_at || status.started_at;
+  if (timestamp) {
+    statusTime.textContent = timestamp;
+  }
+
+  if (status.checkpoint) {
     statusCheckpoint.textContent = status.checkpoint;
   }
 
@@ -210,12 +278,14 @@ async function handleJobComplete(status) {
     if (statusText) {
       statusText.textContent = 'complete!';
     }
+    statusText.textContent = 'complete!';
 
     // Wait a moment then show preview
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Load video
     if (status.download_url && resultVideo) {
+    if (status.download_url) {
       const baseVideoUrl = status.download_url.startsWith('http') ?
         status.download_url :
         `${APP_CONFIG.API_BASE}${status.download_url}`;
