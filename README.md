@@ -63,6 +63,11 @@ mono_gen/
 - `GET /status/{job_id}` - Get job status and progress
 - `GET /download?path=<filename>` - Download generated video
 
+If `API_KEY` is set in the environment the UI must send the key in an `X-API-Key`
+header for API requests. The generated video download URL also accepts the key as an
+`api_key` query parameter so that the `<video>` element can fetch the file without
+custom headers.
+
 ### Job System
 
 The API uses an asynchronous job system for video generation:
@@ -101,6 +106,10 @@ Copy `.env.example` to `.env` and configure:
 - `CKPT_FILE`: Checkpoint filename
 - `HF_TOKEN`: HuggingFace authentication token
 - `API_KEY`: Optional API key for authentication
+
+If you set `API_KEY`, update `ui/config.js` (or inject `window.CONFIG`) with the same
+value so the frontend automatically includes it when calling the API and when
+requesting the generated video.
 
 ## Development
 

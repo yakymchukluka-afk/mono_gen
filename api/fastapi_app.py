@@ -54,9 +54,16 @@ class StatusResponse(BaseModel):
     log_tail: List[str]
     download_url: Optional[str] = None
 
-def check_api_key(x_api_key: Optional[str] = Header(None)):
-    """Check API key if required"""
-    if API_KEY and x_api_key != API_KEY:
+def check_api_key(
+    x_api_key: Optional[str] = None,
+    api_key_query: Optional[str] = None,
+):
+    """Check API key if required, supporting header and query parameters."""
+    if not API_KEY:
+        return True
+
+    provided_key = x_api_key or api_key_query
+    if provided_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
     return True
 
@@ -193,7 +200,7 @@ async def generate_video(
     """Generate a latent walk video asynchronously"""
     # Check API key if required
     if API_KEY:
-        check_api_key(x_api_key)
+        check_api_key(x_api_key=x_api_key)
     
     # Generate unique job ID
     job_id = str(uuid.uuid4())
@@ -222,7 +229,7 @@ async def get_job_status(
     """Get job status and progress"""
     # Check API key if required
     if API_KEY:
-        check_api_key(x_api_key)
+        check_api_key(x_api_key=x_api_key)
     
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -241,12 +248,13 @@ async def get_job_status(
 @app.get("/download")
 async def download_video(
     path: str = Query(..., description="Video file path"),
-    x_api_key: Optional[str] = Header(None)
+    x_api_key: Optional[str] = Header(None),
+    api_key: Optional[str] = Query(None, description="API key for download authentication")
 ):
     """Download generated video"""
     # Check API key if required
     if API_KEY:
-        check_api_key(x_api_key)
+        check_api_key(x_api_key=x_api_key, api_key_query=api_key)
     
     # Security: accept only basenames and read from OUTPUT_DIR
     fname = Path(path).name
