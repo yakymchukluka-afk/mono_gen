@@ -1,18 +1,16 @@
 import os
-import tempfile
 import uuid
-import asyncio
+import json
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Header, Query, BackgroundTasks
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, List
 import uvicorn
 import sys
-from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from app import gen_video
 
@@ -29,6 +27,8 @@ app.add_middleware(
 
 # Configuration
 API_KEY = os.getenv("API_KEY")
+DEFAULT_CHECKPOINT = os.getenv("CKPT_FILE", "checkpoint-13")
+LOG_POLL_MS = int(os.getenv("LOG_POLL_MS", "1000"))
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -269,6 +269,19 @@ async def download_video(
         media_type="video/mp4",
         filename=fname
     )
+
+
+@app.get("/runtime-config.js")
+async def runtime_config_js():
+    """Expose runtime configuration to the browser."""
+    config = {
+        "API_BASE": "",
+        "API_KEY": API_KEY or "",
+        "LOG_POLL_MS": LOG_POLL_MS,
+        "DEFAULT_CHECKPOINT": DEFAULT_CHECKPOINT,
+    }
+    body = f"window.CONFIG = {json.dumps(config)};"
+    return Response(content=body, media_type="application/javascript")
 
 # Mount UI static files
 app.mount("/", StaticFiles(directory=str(Path(__file__).resolve().parent.parent / "ui"), html=True), name="ui")

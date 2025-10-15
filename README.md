@@ -107,9 +107,24 @@ Copy `.env.example` to `.env` and configure:
 - `HF_TOKEN`: HuggingFace authentication token
 - `API_KEY`: Optional API key for authentication
 
-If you set `API_KEY`, update `ui/config.js` (or inject `window.CONFIG`) with the same
-value so the frontend automatically includes it when calling the API and when
-requesting the generated video.
+If you set `API_KEY`, the server now injects it into `/runtime-config.js` so the
+frontend automatically authenticates every request and appends the key to the
+video download URL.
+
+### Runtime configuration exposed to the UI
+
+The browser loads `/runtime-config.js`, which is generated at runtime from
+environment variables:
+
+| Variable        | Purpose                                              | Default           |
+| --------------- | ----------------------------------------------------- | ----------------- |
+| `API_KEY`       | API key required for UI/API access                    | *(empty)*         |
+| `CKPT_FILE`     | Sets the displayed checkpoint lineage in the UI       | `checkpoint-13`   |
+| `LOG_POLL_MS`   | Interval (ms) for refreshing the console log display  | `1000`            |
+
+The Hugging Face credentials (`HF_TOKEN`, `MODEL_REPO`) and optional RunPod
+`PUBLIC_KEY`/`JUPYTER_PASSWORD` values are consumed by other tooling and do not
+need to be surfaced to the browser.
 
 ## Development
 
