@@ -14,8 +14,7 @@ mono_gen/
 ├── ui/
 │   ├── index.html           # Main UI
 │   ├── app.js              # UI logic
-│   ├── styles.css          # Styling
-│   └── config.js           # API configuration
+│   └── styles.css          # Styling
 ├── .env.example            # Environment variables template
 └── README.md
 ```
@@ -30,30 +29,62 @@ mono_gen/
 
 ## Quick Start (RunPod)
 
-1. **Clone and setup**:
+1. **Clone or update the repository**
    ```bash
-   cd ~/mono_gen
-   git pull
+   cd /workspace
+   # First-time pod: git clone https://github.com/<your-org>/mono_gen.git
+   cd mono_gen
+   git pull  # no-op if you just cloned
+   ```
+   > ℹ️ Run the rest of the commands from `/workspace/mono_gen`. The helper script
+   > resolves its own path, so you can invoke it with `bash setup_runpod.sh` from
+   > anywhere, but the manual commands below assume you are in the repo root.
+
+2. **Provide the required environment variables in RunPod**
+   - `MODEL_REPO` – Hugging Face repository containing your weights
+   - `CKPT_FILE` – checkpoint filename inside the repo
+   - `HF_TOKEN` – Hugging Face token with access to the checkpoint
+   - `API_KEY` – (optional) string your UI will use for authenticated calls
+
+   Set these in the **Environment Variables** section of your RunPod template or pod. The backend reads them on startup and `/runtime-config.js` automatically exposes the safe values (API key, checkpoint name, polling interval) to the browser.
+
+3. **Launch the automated setup**
+   ```bash
+   bash setup_runpod.sh
+   ```
+    The script installs CUDA-enabled PyTorch, project dependencies, verifies the UI assets, and starts `uvicorn` on port 8888. Logs stream to `/workspace/mono_gen/server.log`.
+
+4. **Open the UI**
+   Visit the HTTPS link that RunPod provides for port 8888. The page will fetch `/runtime-config.js`, attach your API key to every request, and handle video downloads.
+
+5. **Monitor or restart as needed**
+   ```bash
+    tail -f /workspace/mono_gen/server.log   # live logs
+   pkill -f uvicorn               # stop the server
+   bash setup_runpod.sh           # rerun setup/start
    ```
 
-2. **Install dependencies**:
+### Manual startup (advanced)
+
+If you prefer to control each step yourself:
+
+1. Install dependencies
    ```bash
+   cd /workspace/mono_gen
+   pip install --extra-index-url https://download.pytorch.org/whl/cu121 \
+     torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2
    pip install -r api/requirements.txt
    ```
 
-3. **Configure environment**:
+2. Export the same environment variables that you configured in RunPod (for local shells you can `cp .env.example .env` and fill it in).
+
+3. Start the server from the repository root
    ```bash
-   cp .env.example .env
-   # Edit .env with your HuggingFace token and other settings
+   cd /workspace/mono_gen
+   uvicorn api.fastapi_app:app --host 0.0.0.0 --port 8888 --workers 1
    ```
 
-4. **Start the server**:
-   ```bash
-   cd api
-   uvicorn fastapi_app:app --host 0.0.0.0 --port 8888 --workers 1
-   ```
-
-5. **Access the UI**: Open your RunPod HTTP link to port 8888
+4. Open the RunPod HTTP URL for port 8888. The UI will automatically read `/runtime-config.js`, send the `X-API-Key` header when required, and append `?api_key=...` to the video preview URL.
 
 ## API Endpoints
 
