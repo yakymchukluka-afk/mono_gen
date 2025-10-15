@@ -1,16 +1,43 @@
 // Configuration for backend endpoints
 const APP_CONFIG = Object.assign({
   API_BASE: "", // same-origin by default
+  API_KEY: "",
   DEFAULT_CHECKPOINT: "checkpoint-13",
   POLL_INTERVAL_MS: 2000, // Poll every 2 seconds
   POLL_TIMEOUT_MS: 10 * 60 * 1000, // 10 minute timeout
   LOG_POLL_MS: 1000
 }, (window.CONFIG || {}));
 
-// Helper to switch views
+function buildHeaders(extra = {}) {
+  const headers = { ...extra };
+  if (APP_CONFIG.API_KEY) {
+    headers['X-API-Key'] = APP_CONFIG.API_KEY;
+  }
+  return headers;
+}
+
+// Helper to switch views (compatible with legacy markup)
 function showView(id) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('view--active'));
-  document.getElementById(id).classList.add('view--active');
+  let found = false;
+  document.querySelectorAll('.view').forEach(view => {
+    if (!view) {
+      return;
+    }
+
+    const isActive = view.id === id;
+    if (isActive) {
+      found = true;
+    }
+
+    view.classList.toggle('view--active', isActive);
+    if (view.style) {
+      view.style.display = isActive ? 'block' : 'none';
+    }
+  });
+
+  if (!found) {
+    console.warn('showView: requested view not found', id);
+  }
 }
 
 // API helpers for new job-based system
@@ -18,7 +45,7 @@ async function initiateLatentWalk() {
   const url = `${APP_CONFIG.API_BASE}/generate`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       seconds: 30,
       fps: 30,
@@ -35,7 +62,9 @@ async function initiateLatentWalk() {
 
 async function getJobStatus(jobId) {
   const url = `${APP_CONFIG.API_BASE}/status/${jobId}`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: buildHeaders(),
+  });
   if (!res.ok) throw new Error(`status check failed (${res.status})`);
   return await res.json();
 }
@@ -44,12 +73,17 @@ async function getJobStatus(jobId) {
 const btnStart = document.getElementById('btn-start');
 const back1 = document.getElementById('back-to-landing');
 const back2 = document.getElementById('back-to-landing-2');
-const progressBar = document.getElementById('progress-bar');
 const statusText = document.getElementById('status-text');
 const statusTime = document.getElementById('status-time');
 const statusCheckpoint = document.getElementById('status-checkpoint');
 const resultVideo = document.getElementById('result-video');
 const consoleEl = document.getElementById('console');
+
+function setStartDisabled(disabled) {
+  if (btnStart) {
+    btnStart.disabled = disabled;
+  }
+}
 
 // Debug logging
 console.log('UI JavaScript loaded');
@@ -61,44 +95,53 @@ let pollStartedAt = 0;
 let currentJobId = null;
 let generating = false;
 
-btnStart.addEventListener('click', async () => {
-  console.log('Button clicked!');
-  // Prevent double submissions
-  if (generating) {
-    console.log('Already generating, ignoring click');
-    return;
-  }
-  
-  console.log('Starting generation...');
-  generating = true;
-  btnStart.disabled = true;
-  
-  try {
-    showView('step-progress');
-    // Reset UI
-    progressBar.style.width = '0%';
-    statusText.textContent = 'queued ...';
-    statusCheckpoint.textContent = APP_CONFIG.DEFAULT_CHECKPOINT;
-    pollStartedAt = Date.now();
-    statusTime.textContent = new Date(pollStartedAt).toISOString();
-    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = ''; }
+if (btnStart) {
+  btnStart.addEventListener('click', async () => {
+    console.log('Button clicked!');
+    // Prevent double submissions
+    if (generating) {
+      console.log('Already generating, ignoring click');
+      return;
+    }
 
-    // Start job
-    const { jobId } = await initiateLatentWalk();
-    currentJobId = jobId;
-    
-    // Start polling for status
-    startStatusPolling(jobId);
-    
-  } catch (err) {
-    console.error(err);
-    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
-    showView('step-landing');
-    generating = false;
-    btnStart.disabled = false;
-  }
-  // Note: generating and btnStart.disabled are handled in startStatusPolling callbacks
-});
+    console.log('Starting generation...');
+    generating = true;
+    setStartDisabled(true);
+
+    try {
+      showView('step-progress');
+      // Reset UI
+      if (statusText) {
+        statusText.textContent = 'queued ...';
+      }
+      if (statusCheckpoint) {
+        statusCheckpoint.textContent = APP_CONFIG.DEFAULT_CHECKPOINT;
+      }
+      pollStartedAt = Date.now();
+      if (statusTime) {
+        statusTime.textContent = new Date(pollStartedAt).toISOString();
+      }
+      if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = 'initializing latent walk ...'; }
+
+      // Start job
+      const { jobId } = await initiateLatentWalk();
+      currentJobId = jobId;
+
+      // Start polling for status
+      startStatusPolling(jobId);
+
+    } catch (err) {
+      console.error(err);
+      if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
+      showView('step-landing');
+      generating = false;
+      setStartDisabled(false);
+    }
+    // Note: generating and btnStart.disabled are handled in startStatusPolling callbacks
+  });
+} else {
+  console.warn('Start button not found; check markup.');
+}
 
 function startStatusPolling(jobId) {
   clearInterval(pollTimer);
@@ -128,27 +171,38 @@ function startStatusPolling(jobId) {
       if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
       showView('step-landing');
       generating = false;
-      btnStart.disabled = false;
+      setStartDisabled(false);
     }
   }, APP_CONFIG.POLL_INTERVAL_MS);
 }
 
 function updateProgress(status) {
-  // Update progress bar
-  const progressPercent = Math.round(status.progress * 100);
-  progressBar.style.width = `${progressPercent}%`;
-  
   // Update status text
-  if (status.state === 'queued') {
-    statusText.textContent = 'queued ...';
-  } else if (status.state === 'running') {
-    statusText.textContent = `generating ... ${status.frames_done}/${status.total_frames} frames`;
-  } else if (status.state === 'done') {
-    statusText.textContent = 'complete!';
-  } else if (status.state === 'error') {
-    statusText.textContent = 'error occurred';
+  if (statusText) {
+    if (status.state === 'queued') {
+      statusText.textContent = 'queued ...';
+    } else if (status.state === 'running') {
+      if (typeof status.frames_done === 'number' && typeof status.total_frames === 'number') {
+        statusText.textContent = `generating ... ${status.frames_done}/${status.total_frames} frames`;
+      } else {
+        statusText.textContent = 'generating ...';
+      }
+    } else if (status.state === 'done') {
+      statusText.textContent = 'complete!';
+    } else if (status.state === 'error') {
+      statusText.textContent = 'error occurred';
+    }
   }
-  
+
+  const timestamp = status.updated_at || status.completed_at || status.started_at;
+  if (statusTime && timestamp) {
+    statusTime.textContent = timestamp;
+  }
+
+  if (statusCheckpoint && status.checkpoint) {
+    statusCheckpoint.textContent = status.checkpoint;
+  }
+
   // Update console with log tail
   if (consoleEl && status.log_tail && status.log_tail.length > 0) {
     consoleEl.textContent = status.log_tail.join('\n');
@@ -158,31 +212,37 @@ function updateProgress(status) {
 async function handleJobComplete(status) {
   try {
     // Show completion status
-    statusText.textContent = 'complete!';
-    progressBar.style.width = '100%';
-    
+    if (statusText) {
+      statusText.textContent = 'complete!';
+    }
+
     // Wait a moment then show preview
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Load video
-    if (status.download_url) {
-      const videoUrl = status.download_url.startsWith('http') ? 
-        status.download_url : 
+    if (status.download_url && resultVideo) {
+      const baseVideoUrl = status.download_url.startsWith('http') ?
+        status.download_url :
         `${APP_CONFIG.API_BASE}${status.download_url}`;
-      
-      resultVideo.src = videoUrl;
+
+      const videoUrlObj = new URL(baseVideoUrl, window.location.origin);
+      if (APP_CONFIG.API_KEY) {
+        videoUrlObj.searchParams.set('api_key', APP_CONFIG.API_KEY);
+      }
+
+      resultVideo.src = videoUrlObj.toString();
       resultVideo.load();
     }
-    
+
     showView('step-preview');
-    
+
   } catch (err) {
     console.error('Error handling job completion:', err);
     if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
     showView('step-landing');
   } finally {
     generating = false;
-    btnStart.disabled = false;
+    setStartDisabled(false);
   }
 }
 
@@ -191,16 +251,20 @@ function handleJobError(status) {
   if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: Job failed`; }
   showView('step-landing');
   generating = false;
-  btnStart.disabled = false;
+  setStartDisabled(false);
 }
 
-back1.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
-back2.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
+if (back1) {
+  back1.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
+}
+if (back2) {
+  back2.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
+}
 
 function abortAndHome() {
   clearInterval(pollTimer);
   showView('step-landing');
   generating = false;
-  btnStart.disabled = false;
+  setStartDisabled(false);
   currentJobId = null;
 }
