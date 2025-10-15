@@ -63,6 +63,11 @@ mono_gen/
 - `GET /status/{job_id}` - Get job status and progress
 - `GET /download?path=<filename>` - Download generated video
 
+If `API_KEY` is set in the environment the UI must send the key in an `X-API-Key`
+header for API requests. The generated video download URL also accepts the key as an
+`api_key` query parameter so that the `<video>` element can fetch the file without
+custom headers.
+
 ### Job System
 
 The API uses an asynchronous job system for video generation:
@@ -101,6 +106,25 @@ Copy `.env.example` to `.env` and configure:
 - `CKPT_FILE`: Checkpoint filename
 - `HF_TOKEN`: HuggingFace authentication token
 - `API_KEY`: Optional API key for authentication
+
+If you set `API_KEY`, the server now injects it into `/runtime-config.js` so the
+frontend automatically authenticates every request and appends the key to the
+video download URL.
+
+### Runtime configuration exposed to the UI
+
+The browser loads `/runtime-config.js`, which is generated at runtime from
+environment variables:
+
+| Variable        | Purpose                                              | Default           |
+| --------------- | ----------------------------------------------------- | ----------------- |
+| `API_KEY`       | API key required for UI/API access                    | *(empty)*         |
+| `CKPT_FILE`     | Sets the displayed checkpoint lineage in the UI       | `checkpoint-13`   |
+| `LOG_POLL_MS`   | Interval (ms) for refreshing the console log display  | `1000`            |
+
+The Hugging Face credentials (`HF_TOKEN`, `MODEL_REPO`) and optional RunPod
+`PUBLIC_KEY`/`JUPYTER_PASSWORD` values are consumed by other tooling and do not
+need to be surfaced to the browser.
 
 ## Development
 

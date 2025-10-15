@@ -1,11 +1,20 @@
 // Configuration for backend endpoints
 const APP_CONFIG = Object.assign({
   API_BASE: "", // same-origin by default
+  API_KEY: "",
   DEFAULT_CHECKPOINT: "checkpoint-13",
   POLL_INTERVAL_MS: 2000, // Poll every 2 seconds
   POLL_TIMEOUT_MS: 10 * 60 * 1000, // 10 minute timeout
   LOG_POLL_MS: 1000
 }, (window.CONFIG || {}));
+
+function buildHeaders(extra = {}) {
+  const headers = { ...extra };
+  if (APP_CONFIG.API_KEY) {
+    headers['X-API-Key'] = APP_CONFIG.API_KEY;
+  }
+  return headers;
+}
 
 // Helper to switch views
 function showView(id) {
@@ -18,7 +27,7 @@ async function initiateLatentWalk() {
   const url = `${APP_CONFIG.API_BASE}/generate`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       seconds: 30,
       fps: 30,
@@ -35,7 +44,9 @@ async function initiateLatentWalk() {
 
 async function getJobStatus(jobId) {
   const url = `${APP_CONFIG.API_BASE}/status/${jobId}`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: buildHeaders(),
+  });
   if (!res.ok) throw new Error(`status check failed (${res.status})`);
   return await res.json();
 }
@@ -166,11 +177,16 @@ async function handleJobComplete(status) {
     
     // Load video
     if (status.download_url) {
-      const videoUrl = status.download_url.startsWith('http') ? 
-        status.download_url : 
+      const baseVideoUrl = status.download_url.startsWith('http') ?
+        status.download_url :
         `${APP_CONFIG.API_BASE}${status.download_url}`;
-      
-      resultVideo.src = videoUrl;
+
+      const videoUrlObj = new URL(baseVideoUrl, window.location.origin);
+      if (APP_CONFIG.API_KEY) {
+        videoUrlObj.searchParams.set('api_key', APP_CONFIG.API_KEY);
+      }
+
+      resultVideo.src = videoUrlObj.toString();
       resultVideo.load();
     }
     
