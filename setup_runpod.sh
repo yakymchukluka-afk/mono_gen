@@ -57,10 +57,9 @@ else
   pip install -q fastapi==0.119.0 uvicorn==0.37.0 imageio==2.37.0 imageio-ffmpeg==0.6.0 numpy==1.26.4 huggingface_hub psutil pillow
 fi
 
-# Step 4 — ensure the UI is present and configured
-echo "🎨 Step 4: Configuring UI..."
+# Step 4 — ensure the UI assets exist
+echo "🎨 Step 4: Verifying UI assets..."
 
-# Check if UI directory exists
 if [ ! -d ui ]; then
   echo "❌ UI directory not found!"
   echo "Available directories:"
@@ -68,33 +67,13 @@ if [ ! -d ui ]; then
   exit 1
 fi
 
-# Configure UI for same-origin calls and no API key
-echo "⚙️  Configuring UI for same-origin API calls..."
-if [ -f ui/config.js ]; then
-  sed -i 's#API_BASE: .*#API_BASE: ""#; s#API_KEY: .*#API_KEY: ""#' ui/config.js
-  echo "✅ Updated ui/config.js"
-else
-  echo "⚠️  ui/config.js not found, creating default config..."
-  cat > ui/config.js << 'EOF'
-window.CONFIG = {
-  API_BASE: "", // same-origin in RunPod
-  API_KEY: "", // optional API key
-  LOG_POLL_MS: 1000,
-  DEFAULT_CHECKPOINT: "checkpoint-13"
-};
-EOF
+if [ ! -f ui/index.html ]; then
+  echo "❌ ui/index.html is missing — did the repo clone correctly?"
+  exit 1
 fi
 
-# Ensure proper script loading order in HTML
-if [ -f ui/index.html ]; then
-  echo "🔧 Ensuring proper script loading order..."
-  # Remove any existing script tags
-  sed -i 's#<script src="config.js.*</script>##g' ui/index.html
-  sed -i 's#<script src="app.js.*</script>##g' ui/index.html
-  
-  # Add scripts in correct order before closing body tag
-  sed -i 's#</body>#    <script src="config.js?v=8"></script>\n    <script src="app.js?v=8"></script>\n  </body>#' ui/index.html
-  echo "✅ Updated ui/index.html script loading"
+if ! grep -q "/runtime-config.js" ui/index.html; then
+  echo "⚠️  ui/index.html is missing the runtime config loader. Pull the latest main branch."
 fi
 
 # Step 5 — stop any existing services on port 8888
@@ -110,13 +89,15 @@ echo "🚀 Step 6: Starting API server..."
 cd ~/mono_gen
 
 # Create outputs directory if it doesn't exist
-mkdir -p api/outputs
+if [ "$APP" = "api.fastapi_app:app" ]; then
+  mkdir -p api/outputs
+else
+  mkdir -p outputs
+fi
 
 # Start the server
 echo "Starting uvicorn with: $APP"
-cd api
-nohup uvicorn fastapi_app:app --host 0.0.0.0 --port 8888 --workers 1 --log-level info > ../server.log 2>&1 &
-cd ..
+nohup uvicorn "$APP" --host 0.0.0.0 --port 8888 --workers 1 --log-level info > server.log 2>&1 &
 sleep 3
 
 # Show server startup logs
@@ -140,9 +121,7 @@ else
   echo "Trying to restart server..."
   pkill -f uvicorn
   sleep 2
-  cd api
-  nohup uvicorn fastapi_app:app --host 0.0.0.0 --port 8888 --workers 1 --log-level info > ../server.log 2>&1 &
-  cd ..
+  nohup uvicorn "$APP" --host 0.0.0.0 --port 8888 --workers 1 --log-level info > server.log 2>&1 &
   sleep 3
   tail -n 20 server.log
 fi
