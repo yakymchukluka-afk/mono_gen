@@ -85,53 +85,57 @@ let pollStartedAt = 0;
 let currentJobId = null;
 let generating = false;
 
-btnStart.addEventListener('click', async () => {
-  console.log('Button clicked!');
-  // Prevent double submissions
-  if (generating) {
-    console.log('Already generating, ignoring click');
-    return;
-  }
-  
-  console.log('Starting generation...');
-  generating = true;
-  btnStart.disabled = true;
-  
-  try {
-    showView('step-progress');
-    // Reset UI
-    if (legacyProgressBar) {
-      legacyProgressBar.style.width = '0%';
+if (btnStart) {
+  btnStart.addEventListener('click', async () => {
+    console.log('Button clicked!');
+    // Prevent double submissions
+    if (generating) {
+      console.log('Already generating, ignoring click');
+      return;
     }
 
-    if (statusText) {
-      statusText.textContent = 'queued ...';
-    }
-    if (statusCheckpoint) {
-      statusCheckpoint.textContent = APP_CONFIG.DEFAULT_CHECKPOINT;
-    }
-    pollStartedAt = Date.now();
-    if (statusTime) {
-      statusTime.textContent = new Date(pollStartedAt).toISOString();
-    }
-    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = 'initializing latent walk ...'; }
+    console.log('Starting generation...');
+    generating = true;
+    btnStart.disabled = true;
 
-    // Start job
-    const { jobId } = await initiateLatentWalk();
-    currentJobId = jobId;
-    
-    // Start polling for status
-    startStatusPolling(jobId);
-    
-  } catch (err) {
-    console.error(err);
-    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
-    showView('step-landing');
-    generating = false;
-    btnStart.disabled = false;
-  }
-  // Note: generating and btnStart.disabled are handled in startStatusPolling callbacks
-});
+    try {
+      showView('step-progress');
+      // Reset UI
+      if (legacyProgressBar) {
+        legacyProgressBar.style.width = '0%';
+      }
+
+      if (statusText) {
+        statusText.textContent = 'queued ...';
+      }
+      if (statusCheckpoint) {
+        statusCheckpoint.textContent = APP_CONFIG.DEFAULT_CHECKPOINT;
+      }
+      pollStartedAt = Date.now();
+      if (statusTime) {
+        statusTime.textContent = new Date(pollStartedAt).toISOString();
+      }
+      if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = 'initializing latent walk ...'; }
+
+      // Start job
+      const { jobId } = await initiateLatentWalk();
+      currentJobId = jobId;
+
+      // Start polling for status
+      startStatusPolling(jobId);
+
+    } catch (err) {
+      console.error(err);
+      if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
+      showView('step-landing');
+      generating = false;
+      btnStart.disabled = false;
+    }
+    // Note: generating and btnStart.disabled are handled in startStatusPolling callbacks
+  });
+} else {
+  console.warn('Start button not found; check markup.');
+}
 
 function startStatusPolling(jobId) {
   clearInterval(pollTimer);
@@ -215,7 +219,7 @@ async function handleJobComplete(status) {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Load video
-    if (status.download_url) {
+    if (status.download_url && resultVideo) {
       const baseVideoUrl = status.download_url.startsWith('http') ?
         status.download_url :
         `${APP_CONFIG.API_BASE}${status.download_url}`;
@@ -228,9 +232,9 @@ async function handleJobComplete(status) {
       resultVideo.src = videoUrlObj.toString();
       resultVideo.load();
     }
-    
+
     showView('step-preview');
-    
+
   } catch (err) {
     console.error('Error handling job completion:', err);
     if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
@@ -249,8 +253,12 @@ function handleJobError(status) {
   btnStart.disabled = false;
 }
 
-back1.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
-back2.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
+if (back1) {
+  back1.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
+}
+if (back2) {
+  back2.addEventListener('click', (e) => { e.preventDefault(); abortAndHome(); });
+}
 
 function abortAndHome() {
   clearInterval(pollTimer);
