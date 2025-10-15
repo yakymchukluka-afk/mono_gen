@@ -76,6 +76,12 @@ const resultVideo = document.getElementById('result-video');
 const consoleEl = document.getElementById('console');
 const legacyProgressBar = document.getElementById('progress-bar');
 
+function setStartDisabled(disabled) {
+  if (btnStart) {
+    btnStart.disabled = disabled;
+  }
+}
+
 // Debug logging
 console.log('UI JavaScript loaded');
 console.log('Button element:', btnStart);
@@ -203,7 +209,7 @@ function startStatusPolling(jobId) {
       if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
       showView('step-landing');
       generating = false;
-      btnStart.disabled = false;
+      setStartDisabled(false);
     }
   }, APP_CONFIG.POLL_INTERVAL_MS);
 }
@@ -301,7 +307,7 @@ async function handleJobComplete(status) {
     showView('step-landing');
   } finally {
     generating = false;
-    btnStart.disabled = false;
+    setStartDisabled(false);
   }
 }
 
@@ -310,7 +316,7 @@ function handleJobError(status) {
   if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: Job failed`; }
   showView('step-landing');
   generating = false;
-  btnStart.disabled = false;
+  setStartDisabled(false);
 }
 
 if (back1) {
@@ -324,6 +330,6 @@ function abortAndHome() {
   clearInterval(pollTimer);
   showView('step-landing');
   generating = false;
-  btnStart.disabled = false;
+  setStartDisabled(false);
   currentJobId = null;
 }
