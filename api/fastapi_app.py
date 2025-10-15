@@ -1,18 +1,16 @@
 import os
-import tempfile
 import uuid
-import asyncio
+import json
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Header, Query, BackgroundTasks
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, List
 import uvicorn
 import sys
-from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from app import gen_video
 
@@ -29,6 +27,8 @@ app.add_middleware(
 
 # Configuration
 API_KEY = os.getenv("API_KEY")
+DEFAULT_CHECKPOINT = os.getenv("CKPT_FILE", "checkpoint-13")
+LOG_POLL_MS = int(os.getenv("LOG_POLL_MS", "1000"))
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -54,9 +54,16 @@ class StatusResponse(BaseModel):
     log_tail: List[str]
     download_url: Optional[str] = None
 
-def check_api_key(x_api_key: Optional[str] = Header(None)):
-    """Check API key if required"""
-    if API_KEY and x_api_key != API_KEY:
+def check_api_key(
+    x_api_key: Optional[str] = None,
+    api_key_query: Optional[str] = None,
+):
+    """Check API key if required, supporting header and query parameters."""
+    if not API_KEY:
+        return True
+
+    provided_key = x_api_key or api_key_query
+    if provided_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
     return True
 
@@ -193,7 +200,7 @@ async def generate_video(
     """Generate a latent walk video asynchronously"""
     # Check API key if required
     if API_KEY:
-        check_api_key(x_api_key)
+        check_api_key(x_api_key=x_api_key)
     
     # Generate unique job ID
     job_id = str(uuid.uuid4())
@@ -222,7 +229,7 @@ async def get_job_status(
     """Get job status and progress"""
     # Check API key if required
     if API_KEY:
-        check_api_key(x_api_key)
+        check_api_key(x_api_key=x_api_key)
     
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -241,12 +248,13 @@ async def get_job_status(
 @app.get("/download")
 async def download_video(
     path: str = Query(..., description="Video file path"),
-    x_api_key: Optional[str] = Header(None)
+    x_api_key: Optional[str] = Header(None),
+    api_key: Optional[str] = Query(None, description="API key for download authentication")
 ):
     """Download generated video"""
     # Check API key if required
     if API_KEY:
-        check_api_key(x_api_key)
+        check_api_key(x_api_key=x_api_key, api_key_query=api_key)
     
     # Security: accept only basenames and read from OUTPUT_DIR
     fname = Path(path).name
@@ -261,6 +269,19 @@ async def download_video(
         media_type="video/mp4",
         filename=fname
     )
+
+
+@app.get("/runtime-config.js")
+async def runtime_config_js():
+    """Expose runtime configuration to the browser."""
+    config = {
+        "API_BASE": "",
+        "API_KEY": API_KEY or "",
+        "LOG_POLL_MS": LOG_POLL_MS,
+        "DEFAULT_CHECKPOINT": DEFAULT_CHECKPOINT,
+    }
+    body = f"window.CONFIG = {json.dumps(config)};"
+    return Response(content=body, media_type="application/javascript")
 
 # Mount UI static files
 app.mount("/", StaticFiles(directory=str(Path(__file__).resolve().parent.parent / "ui"), html=True), name="ui")

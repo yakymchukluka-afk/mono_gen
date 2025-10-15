@@ -44,21 +44,18 @@
 
       <!-- Step 2: Progress -->
       <section id="step-progress" class="view">
-        <div class="container container--center">
+        <div class="container container--log">
           <a href="#" id="back-to-landing" class="link link--back">&lt; Go back</a>
-          <h1 class="title">mono latent walk</h1>
-          <div class="progress">
-            <div id="progress-bar" class="progress__bar" style="width: 0%"></div>
-          </div>
-          <pre id="console" class="console" aria-live="polite" aria-atomic="false" hidden></pre>
-          <div class="meta">
-            <div class="meta__left">
-              <div>&gt; <span id="status-text">producing ...</span></div>
-            </div>
-            <div class="meta__right">
-              <div>time: <span id="status-time">—</span></div>
-              <div>lineage: <span id="status-checkpoint">—</span></div>
-            </div>
+          <div class="log-panel">
+            <header class="log-panel__header">
+              <h1 class="title title--compact">mono latent walk</h1>
+              <div class="log-meta">
+                <div class="log-meta__line">&raquo; <span id="status-text">producing ...</span></div>
+                <div class="log-meta__line">time: <span id="status-time">—</span></div>
+                <div class="log-meta__line">lineage: <span id="status-checkpoint">—</span></div>
+              </div>
+            </header>
+            <pre id="console" class="console" aria-live="polite" aria-atomic="false" hidden></pre>
           </div>
         </div>
       </section>
@@ -78,7 +75,7 @@
       <span>mono-x 2025 | v1.2 | all rights reserved</span>
     </footer>
 
-    <script src="./config.js"></script>
+    <script src="/runtime-config.js"></script>
     <script src="./app.js"></script>
   </body>
   </html>

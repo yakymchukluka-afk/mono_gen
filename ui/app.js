@@ -1,11 +1,20 @@
 // Configuration for backend endpoints
 const APP_CONFIG = Object.assign({
   API_BASE: "", // same-origin by default
+  API_KEY: "",
   DEFAULT_CHECKPOINT: "checkpoint-13",
   POLL_INTERVAL_MS: 2000, // Poll every 2 seconds
   POLL_TIMEOUT_MS: 10 * 60 * 1000, // 10 minute timeout
   LOG_POLL_MS: 1000
 }, (window.CONFIG || {}));
+
+function buildHeaders(extra = {}) {
+  const headers = { ...extra };
+  if (APP_CONFIG.API_KEY) {
+    headers['X-API-Key'] = APP_CONFIG.API_KEY;
+  }
+  return headers;
+}
 
 // Helper to switch views
 function showView(id) {
@@ -18,7 +27,7 @@ async function initiateLatentWalk() {
   const url = `${APP_CONFIG.API_BASE}/generate`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       seconds: 30,
       fps: 30,
@@ -35,7 +44,9 @@ async function initiateLatentWalk() {
 
 async function getJobStatus(jobId) {
   const url = `${APP_CONFIG.API_BASE}/status/${jobId}`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: buildHeaders(),
+  });
   if (!res.ok) throw new Error(`status check failed (${res.status})`);
   return await res.json();
 }
@@ -44,7 +55,6 @@ async function getJobStatus(jobId) {
 const btnStart = document.getElementById('btn-start');
 const back1 = document.getElementById('back-to-landing');
 const back2 = document.getElementById('back-to-landing-2');
-const progressBar = document.getElementById('progress-bar');
 const statusText = document.getElementById('status-text');
 const statusTime = document.getElementById('status-time');
 const statusCheckpoint = document.getElementById('status-checkpoint');
@@ -76,12 +86,11 @@ btnStart.addEventListener('click', async () => {
   try {
     showView('step-progress');
     // Reset UI
-    progressBar.style.width = '0%';
     statusText.textContent = 'queued ...';
     statusCheckpoint.textContent = APP_CONFIG.DEFAULT_CHECKPOINT;
     pollStartedAt = Date.now();
     statusTime.textContent = new Date(pollStartedAt).toISOString();
-    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = ''; }
+    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = 'initializing latent walk ...'; }
 
     // Start job
     const { jobId } = await initiateLatentWalk();
@@ -134,21 +143,30 @@ function startStatusPolling(jobId) {
 }
 
 function updateProgress(status) {
-  // Update progress bar
-  const progressPercent = Math.round(status.progress * 100);
-  progressBar.style.width = `${progressPercent}%`;
-  
   // Update status text
   if (status.state === 'queued') {
     statusText.textContent = 'queued ...';
   } else if (status.state === 'running') {
-    statusText.textContent = `generating ... ${status.frames_done}/${status.total_frames} frames`;
+    if (typeof status.frames_done === 'number' && typeof status.total_frames === 'number') {
+      statusText.textContent = `generating ... ${status.frames_done}/${status.total_frames} frames`;
+    } else {
+      statusText.textContent = 'generating ...';
+    }
   } else if (status.state === 'done') {
     statusText.textContent = 'complete!';
   } else if (status.state === 'error') {
     statusText.textContent = 'error occurred';
   }
-  
+
+  const timestamp = status.updated_at || status.completed_at || status.started_at;
+  if (timestamp) {
+    statusTime.textContent = timestamp;
+  }
+
+  if (status.checkpoint) {
+    statusCheckpoint.textContent = status.checkpoint;
+  }
+
   // Update console with log tail
   if (consoleEl && status.log_tail && status.log_tail.length > 0) {
     consoleEl.textContent = status.log_tail.join('\n');
@@ -159,18 +177,22 @@ async function handleJobComplete(status) {
   try {
     // Show completion status
     statusText.textContent = 'complete!';
-    progressBar.style.width = '100%';
-    
+
     // Wait a moment then show preview
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Load video
     if (status.download_url) {
-      const videoUrl = status.download_url.startsWith('http') ? 
-        status.download_url : 
+      const baseVideoUrl = status.download_url.startsWith('http') ?
+        status.download_url :
         `${APP_CONFIG.API_BASE}${status.download_url}`;
-      
-      resultVideo.src = videoUrl;
+
+      const videoUrlObj = new URL(baseVideoUrl, window.location.origin);
+      if (APP_CONFIG.API_KEY) {
+        videoUrlObj.searchParams.set('api_key', APP_CONFIG.API_KEY);
+      }
+
+      resultVideo.src = videoUrlObj.toString();
       resultVideo.load();
     }
     
