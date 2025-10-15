@@ -78,6 +78,13 @@ const statusTime = document.getElementById('status-time');
 const statusCheckpoint = document.getElementById('status-checkpoint');
 const resultVideo = document.getElementById('result-video');
 const consoleEl = document.getElementById('console');
+const legacyProgressBar = document.getElementById('progress-bar');
+
+function setStartDisabled(disabled) {
+  if (btnStart) {
+    btnStart.disabled = disabled;
+  }
+}
 
 function setStartDisabled(disabled) {
   if (btnStart) {
