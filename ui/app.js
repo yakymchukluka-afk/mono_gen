@@ -74,6 +74,12 @@ const statusCheckpoint = document.getElementById('status-checkpoint');
 const resultVideo = document.getElementById('result-video');
 const consoleEl = document.getElementById('console');
 
+function setStartDisabled(disabled) {
+  if (btnStart) {
+    btnStart.disabled = disabled;
+  }
+}
+
 // Debug logging
 console.log('UI JavaScript loaded');
 console.log('Button element:', btnStart);
@@ -95,7 +101,7 @@ if (btnStart) {
 
     console.log('Starting generation...');
     generating = true;
-    btnStart.disabled = true;
+    setStartDisabled(true);
 
     try {
       showView('step-progress');
@@ -124,7 +130,7 @@ if (btnStart) {
       if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
       showView('step-landing');
       generating = false;
-      btnStart.disabled = false;
+      setStartDisabled(false);
     }
     // Note: generating and btnStart.disabled are handled in startStatusPolling callbacks
   });
@@ -160,7 +166,7 @@ function startStatusPolling(jobId) {
       if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: ${String(err && err.message || err)}`; }
       showView('step-landing');
       generating = false;
-      btnStart.disabled = false;
+      setStartDisabled(false);
     }
   }, APP_CONFIG.POLL_INTERVAL_MS);
 }
@@ -231,7 +237,7 @@ async function handleJobComplete(status) {
     showView('step-landing');
   } finally {
     generating = false;
-    btnStart.disabled = false;
+    setStartDisabled(false);
   }
 }
 
@@ -240,7 +246,7 @@ function handleJobError(status) {
   if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent += `\nERROR: Job failed`; }
   showView('step-landing');
   generating = false;
-  btnStart.disabled = false;
+  setStartDisabled(false);
 }
 
 if (back1) {
@@ -254,6 +260,6 @@ function abortAndHome() {
   clearInterval(pollTimer);
   showView('step-landing');
   generating = false;
-  btnStart.disabled = false;
+  setStartDisabled(false);
   currentJobId = null;
 }
