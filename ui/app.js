@@ -55,7 +55,6 @@ async function getJobStatus(jobId) {
 const btnStart = document.getElementById('btn-start');
 const back1 = document.getElementById('back-to-landing');
 const back2 = document.getElementById('back-to-landing-2');
-const progressBar = document.getElementById('progress-bar');
 const statusText = document.getElementById('status-text');
 const statusTime = document.getElementById('status-time');
 const statusCheckpoint = document.getElementById('status-checkpoint');
@@ -87,12 +86,11 @@ btnStart.addEventListener('click', async () => {
   try {
     showView('step-progress');
     // Reset UI
-    progressBar.style.width = '0%';
     statusText.textContent = 'queued ...';
     statusCheckpoint.textContent = APP_CONFIG.DEFAULT_CHECKPOINT;
     pollStartedAt = Date.now();
     statusTime.textContent = new Date(pollStartedAt).toISOString();
-    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = ''; }
+    if (consoleEl) { consoleEl.hidden = false; consoleEl.textContent = 'initializing latent walk ...'; }
 
     // Start job
     const { jobId } = await initiateLatentWalk();
@@ -145,21 +143,30 @@ function startStatusPolling(jobId) {
 }
 
 function updateProgress(status) {
-  // Update progress bar
-  const progressPercent = Math.round(status.progress * 100);
-  progressBar.style.width = `${progressPercent}%`;
-  
   // Update status text
   if (status.state === 'queued') {
     statusText.textContent = 'queued ...';
   } else if (status.state === 'running') {
-    statusText.textContent = `generating ... ${status.frames_done}/${status.total_frames} frames`;
+    if (typeof status.frames_done === 'number' && typeof status.total_frames === 'number') {
+      statusText.textContent = `generating ... ${status.frames_done}/${status.total_frames} frames`;
+    } else {
+      statusText.textContent = 'generating ...';
+    }
   } else if (status.state === 'done') {
     statusText.textContent = 'complete!';
   } else if (status.state === 'error') {
     statusText.textContent = 'error occurred';
   }
-  
+
+  const timestamp = status.updated_at || status.completed_at || status.started_at;
+  if (timestamp) {
+    statusTime.textContent = timestamp;
+  }
+
+  if (status.checkpoint) {
+    statusCheckpoint.textContent = status.checkpoint;
+  }
+
   // Update console with log tail
   if (consoleEl && status.log_tail && status.log_tail.length > 0) {
     consoleEl.textContent = status.log_tail.join('\n');
@@ -170,8 +177,7 @@ async function handleJobComplete(status) {
   try {
     // Show completion status
     statusText.textContent = 'complete!';
-    progressBar.style.width = '100%';
-    
+
     // Wait a moment then show preview
     await new Promise(resolve => setTimeout(resolve, 1000));
     
