@@ -29,11 +29,16 @@ mono_gen/
 
 ## Quick Start (RunPod)
 
-1. **Clone / pull the repo inside your pod**
+1. **Clone or update the repository**
    ```bash
-   cd ~/mono_gen
-   git pull
+   cd /workspace
+   # First-time pod: git clone https://github.com/<your-org>/mono_gen.git
+   cd mono_gen
+   git pull  # no-op if you just cloned
    ```
+   > ℹ️ Run the rest of the commands from `/workspace/mono_gen`. The helper script
+   > resolves its own path, so you can invoke it with `bash setup_runpod.sh` from
+   > anywhere, but the manual commands below assume you are in the repo root.
 
 2. **Provide the required environment variables in RunPod**
    - `MODEL_REPO` – Hugging Face repository containing your weights
@@ -47,14 +52,14 @@ mono_gen/
    ```bash
    bash setup_runpod.sh
    ```
-   The script installs CUDA-enabled PyTorch, project dependencies, verifies the UI assets, and starts `uvicorn` on port 8888. Logs stream to `~/mono_gen/server.log`.
+    The script installs CUDA-enabled PyTorch, project dependencies, verifies the UI assets, and starts `uvicorn` on port 8888. Logs stream to `/workspace/mono_gen/server.log`.
 
 4. **Open the UI**
    Visit the HTTPS link that RunPod provides for port 8888. The page will fetch `/runtime-config.js`, attach your API key to every request, and handle video downloads.
 
 5. **Monitor or restart as needed**
    ```bash
-   tail -f ~/mono_gen/server.log   # live logs
+    tail -f /workspace/mono_gen/server.log   # live logs
    pkill -f uvicorn               # stop the server
    bash setup_runpod.sh           # rerun setup/start
    ```
@@ -65,6 +70,7 @@ If you prefer to control each step yourself:
 
 1. Install dependencies
    ```bash
+   cd /workspace/mono_gen
    pip install --extra-index-url https://download.pytorch.org/whl/cu121 \
      torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2
    pip install -r api/requirements.txt
@@ -74,6 +80,7 @@ If you prefer to control each step yourself:
 
 3. Start the server from the repository root
    ```bash
+   cd /workspace/mono_gen
    uvicorn api.fastapi_app:app --host 0.0.0.0 --port 8888 --workers 1
    ```
 

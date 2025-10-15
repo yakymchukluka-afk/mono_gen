@@ -9,10 +9,16 @@ echo "🚀 Setting up mono_gen on RunPod..."
 
 # Step 1 — switch to main branch and pull
 echo "📥 Step 1: Updating repository..."
-cd ~/mono_gen
-git fetch --all
-git checkout main
-git pull
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git fetch --all
+  git checkout main
+  git pull
+else
+  echo "⚠️  This directory is not a git repository. Skipping git pull."
+fi
 
 # Step 2 — detect where the app lives (our structure)
 echo "🔍 Step 2: Detecting application structure..."
@@ -86,7 +92,7 @@ sleep 2
 
 # Step 6 — start the API server
 echo "🚀 Step 6: Starting API server..."
-cd ~/mono_gen
+REPO_ROOT="$(pwd)"
 
 # Create outputs directory if it doesn't exist
 if [ "$APP" = "api.fastapi_app:app" ]; then
@@ -97,12 +103,12 @@ fi
 
 # Start the server
 echo "Starting uvicorn with: $APP"
-nohup uvicorn "$APP" --host 0.0.0.0 --port 8888 --workers 1 --log-level info > server.log 2>&1 &
+nohup uvicorn "$APP" --host 0.0.0.0 --port 8888 --workers 1 --log-level info > "$REPO_ROOT/server.log" 2>&1 &
 sleep 3
 
 # Show server startup logs
 echo "📋 Server startup logs:"
-tail -n 20 server.log
+tail -n 20 "$REPO_ROOT/server.log"
 
 # Step 7 — API sanity check
 echo "🔍 Step 7: Testing API..."
@@ -116,14 +122,14 @@ if curl -s http://127.0.0.1:8888/healthz | grep -q '"ok": true'; then
 else
   echo "❌ API health check failed!"
   echo "Server logs:"
-  tail -n 30 server.log
+  tail -n 30 "$REPO_ROOT/server.log"
   echo ""
   echo "Trying to restart server..."
   pkill -f uvicorn
   sleep 2
-  nohup uvicorn "$APP" --host 0.0.0.0 --port 8888 --workers 1 --log-level info > server.log 2>&1 &
+  nohup uvicorn "$APP" --host 0.0.0.0 --port 8888 --workers 1 --log-level info > "$REPO_ROOT/server.log" 2>&1 &
   sleep 3
-  tail -n 20 server.log
+  tail -n 20 "$REPO_ROOT/server.log"
 fi
 
 # Step 8 — show final status
@@ -133,7 +139,7 @@ echo "📊 Server status:"
 ps aux | grep uvicorn | grep -v grep || echo "⚠️  Server process not found"
 echo ""
 echo "🌐 Access your app via the RunPod HTTP link to port 8888"
-echo "📝 Server logs: tail -f ~/mono_gen/server.log"
+echo "📝 Server logs: tail -f $REPO_ROOT/server.log"
 echo "🛑 Stop server: pkill -f uvicorn"
 echo ""
 echo "🧪 Test the API:"
